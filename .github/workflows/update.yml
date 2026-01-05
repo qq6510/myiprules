@@ -1,14 +1,14 @@
 name: Update Merged MRS
 on:
   schedule:
-    - cron: '0 20 * * *'
-  workflow_dispatch:
+    - cron: '0 20 * * *' # 北京时间凌晨 4 点执行
+  workflow_dispatch:      # 允许手动运行
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 必须要有这一行
+      contents: write # 关键：授予写权限，解决 Exit Code 128
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -23,13 +23,23 @@ jobs:
 
       - name: Download Mihomo Kernel
         run: |
-          # 始终下载最新的 Alpha 版本，兼容性最好
-          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep "browser_download_url.*linux-amd64-compatible.gz" | head -n 1 | cut -d '"' -f 4)
+          echo "正在获取 Mihomo 下载链接..."
+          # 使用 grep -o 精确匹配 URL，比 cut 更稳定
+          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep -o "https://.*linux-amd64-compatible.gz" | head -n 1)
+          
+          if [ -z "$MIHOMO_URL" ]; then
+            echo "错误：未能找到 Mihomo 下载链接！"
+            exit 1
+          fi
+
+          echo "下载地址: $MIHOMO_URL"
           curl -L -o mihomo.gz "$MIHOMO_URL"
           gunzip -c mihomo.gz > mihomo
           chmod +x mihomo
+          ./mihomo -v # 验证版本，确保下载成功
 
       - name: Run Merge and Convert
+        # 确保这里使用的是之前发给你的那个“防弹版” Python 脚本
         run: python convert.py
 
       - name: Git Push
@@ -38,11 +48,14 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add output/*.mrs
           
+          # 检查是否有变更
           if git diff --staged --quiet; then
-            echo "No changes detected, skipping push."
+            echo "没有发现规则更新，跳过推送。"
             exit 0
           fi
           
+          echo "发现更新，准备推送..."
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          # 尝试推送到 main，如果失败尝试 master
+          
+          # 智能推送：尝试 main，如果失败则尝试 master
           git push origin HEAD:main || git push origin HEAD:master
