@@ -47,6 +47,3 @@ jobs:
           git commit -m "Update merged MRS: $(date +'%Y-%m-%d %H:%M:%S')"
           # 确保推送到你的主分支（通常是 main 或 master）
           git push origin HEAD:main
-          git add output/*.mrs
-          git commit -m "Update MRS rules: $(date)" || exit 0
-          git push
