@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # 必须要有这一行
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -23,7 +23,7 @@ jobs:
 
       - name: Download Mihomo Kernel
         run: |
-          # 下载兼容性最好的内核版本
+          # 始终下载最新的 Alpha 版本，兼容性最好
           MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep "browser_download_url.*linux-amd64-compatible.gz" | head -n 1 | cut -d '"' -f 4)
           curl -L -o mihomo.gz "$MIHOMO_URL"
           gunzip -c mihomo.gz > mihomo
@@ -37,9 +37,12 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add output/*.mrs
+          
           if git diff --staged --quiet; then
-            echo "No changes"
+            echo "No changes detected, skipping push."
             exit 0
           fi
-          git commit -m "Update MRS: $(date)"
+          
+          git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
+          # 尝试推送到 main，如果失败尝试 master
           git push origin HEAD:main || git push origin HEAD:master
