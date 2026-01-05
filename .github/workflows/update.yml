@@ -1,0 +1,39 @@
+name: Update MRS Rules
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天北京时间上午8点执行
+  workflow_dispatch: # 允许手动点击按钮运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download Mihomo Kernel
+        run: |
+          # 获取最新版 Mihomo
+          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep "browser_download_url.*linux-amd64-compatible" | head -n 1 | cut -d '"' -f 4)
+          curl -L -o mihomo.gz $MIHOMO_URL
+          gunzip -c mihomo.gz > mihomo
+          chmod +x mihomo
+
+      - name: Run convert script
+        run: python convert.py
+
+      - name: Git Push
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Action"
+          git add output/*.mrs
+          git commit -m "Update MRS rules: $(date)" || exit 0
+          git push
