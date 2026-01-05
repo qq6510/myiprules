@@ -3,9 +3,9 @@ import subprocess
 import os
 
 URLS = {
-    "amazon_ipv4.mrs": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/amazon/ipv4_merged.txt",
-    "microsoft_ipv4.mrs": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/microsoft/ipv4_merged.txt",
-    "github_ipv4.mrs": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4_merged.txt"
+    "amazon_ipv4": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/amazon/ipv4_merged.txt",
+    "microsoft_ipv4": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/microsoft/ipv4_merged.txt",
+    "github_ipv4": "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4_merged.txt"
 }
 
 def download_and_convert():
