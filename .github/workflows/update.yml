@@ -1,14 +1,16 @@
-name: Update MRS Rules
+name: Update Merged MRS
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天北京时间上午8点执行
-  workflow_dispatch: # 允许手动点击按钮运行
+    - cron: '0 20 * * *' # 每天北京时间凌晨 4 点运行
+  workflow_dispatch:      # 允许手动触发运行
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:         # 关键：显式声明写入权限
+      contents: write
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -16,24 +18,35 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: pip install requests
 
       - name: Download Mihomo Kernel
         run: |
-          # 获取最新版 Mihomo
-          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep "browser_download_url.*linux-amd64-compatible" | head -n 1 | cut -d '"' -f 4)
-          curl -L -o mihomo.gz $MIHOMO_URL
+          # 获取最新版本并下载
+          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep "browser_download_url.*linux-amd64-compatible.gz" | head -n 1 | cut -d '"' -f 4)
+          curl -L -o mihomo.gz "$MIHOMO_URL"
           gunzip -c mihomo.gz > mihomo
           chmod +x mihomo
 
-      - name: Run convert script
+      - name: Run Merge and Convert
         run: python convert.py
 
-      - name: Git Push
+      - name: Git Push (Push to main)
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add output/*.mrs
+          
+          # 检查是否有文件更新，无更新则静默退出
+          if git diff --staged --quiet; then
+            echo "No changes to commit, skipping push."
+            exit 0
+          fi
+          
+          git commit -m "Update merged MRS: $(date +'%Y-%m-%d %H:%M:%S')"
+          # 确保推送到你的主分支（通常是 main 或 master）
+          git push origin HEAD:main
           git add output/*.mrs
           git commit -m "Update MRS rules: $(date)" || exit 0
           git push
