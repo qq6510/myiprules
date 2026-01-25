@@ -15,8 +15,8 @@ URLS = [
 ]
 
 # 输出文件名配置
-OUTPUT_MRS = "merged_cloud_ips.mrs"
-OUTPUT_TXT = "merged_cloud_ips.txt"
+OUTPUT_MRS = "merged_ips.mrs"
+OUTPUT_TXT = "merged_ips.txt"
 TEMP_TXT = "combined_temp.txt"
 
 def clean_and_validate_ip(line):
