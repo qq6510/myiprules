@@ -5,7 +5,7 @@ import ipaddress
 import sys
 
 # 1. 配置需要合并的 IP 段网址
-URLS = [
+URLS_IPV4 = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/facebook/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/twitter/ipv4.txt",
@@ -14,10 +14,20 @@ URLS = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/perplexity/ipv4.txt"
 ]
 
+URLS_IPV6 = [
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/facebook/ipv6.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv6.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/twitter/ipv6.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/telegram/ipv6.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/openai/ipv6.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/perplexity/ipv6.txt"
+]
+
 # 输出文件名配置
-OUTPUT_MRS = "merged_ips.mrs"
-OUTPUT_TXT = "merged_ips.txt"
-TEMP_TXT = "combined_temp.txt"
+OUTPUT_IPV4_MRS = "merged_ipv4.mrs"
+OUTPUT_IPV4_TXT = "merged_ipv4.txt"
+OUTPUT_IPV6_MRS = "merged_ipv6.mrs"
+OUTPUT_IPV6_TXT = "merged_ipv6.txt"
 
 def clean_and_validate_ip(line):
     line = line.strip()
