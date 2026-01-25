@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 修改点 1：获取完整历史以支持合并
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,6 +47,8 @@ jobs:
             exit 0
           fi
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          # 最小化修改：推送前先合并远程变更
-          git pull --rebase origin main
+          
+          # 修改点 2：拉取时如果遇到文件冲突，优先使用本地新生成的版本
+          git pull --rebase -X theirs origin main
+          
           git push origin HEAD:main
