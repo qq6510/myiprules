@@ -24,22 +24,36 @@ jobs:
       - name: Download Mihomo Kernel
         run: |
           echo "正在获取 Mihomo 下载链接..."
-          # 使用 grep -o 精确匹配 URL，比 cut 更稳定
-          MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/Prerelease-Alpha | grep -o "https://.*linux-amd64-compatible.gz" | head -n 1)
+          
+          # 使用更稳定的 API 方法
+          RELEASES=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases)
+          
+          # 查找包含 linux-amd64-compatible 的版本
+          MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64-compatible\.gz"' | head -1 | cut -d'"' -f4)
           
           if [ -z "$MIHOMO_URL" ]; then
-            echo "错误：未能找到 Mihomo 下载链接！"
+            echo "警告: Prerelease 版本未找到，尝试查找最新的 ARM64 或通用版本"
+            MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*amd64\.gz"' | head -1 | cut -d'"' -f4)
+          fi
+          
+          if [ -z "$MIHOMO_URL" ]; then
+            echo "错误：未能找到任何 Mihomo 下载链接！"
             exit 1
           fi
 
           echo "下载地址: $MIHOMO_URL"
           curl -L -o mihomo.gz "$MIHOMO_URL"
+          
+          if [ ! -f mihomo.gz ]; then
+            echo "错误：文件下载失败"
+            exit 1
+          fi
+          
           gunzip -c mihomo.gz > mihomo
           chmod +x mihomo
           ./mihomo -v # 验证版本，确保下载成功
 
       - name: Run Merge and Convert
-        # 确保这里使用的是之前发给你的那个“防弹版” Python 脚本
         run: python convert.py
 
       - name: Git Push
