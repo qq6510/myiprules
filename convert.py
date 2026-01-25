@@ -12,7 +12,9 @@ URLS = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4_merged.txt"
 ]
 
-OUTPUT_FILENAME = "merged_cloud_ips.mrs"
+# 输出文件名配置
+OUTPUT_MRS = "merged_cloud_ips.mrs"
+OUTPUT_TXT = "merged_cloud_ips.txt"  # 新增文本输出文件名
 TEMP_TXT = "combined_temp.txt"
 
 def clean_and_validate_ip(line):
@@ -21,7 +23,6 @@ def clean_and_validate_ip(line):
     if ';' in line: line = line.split(';')[0].strip()
     if not line: return None
     try:
-        # 自动处理 1.1.1.1/24 -> 1.1.1.0/24
         net = ipaddress.ip_network(line, strict=False)
         return str(net)
     except ValueError:
@@ -51,12 +52,24 @@ def download_and_merge():
         print("错误：未提取到有效 IP")
         sys.exit(1)
 
-    with open(TEMP_TXT, "w", encoding="utf-8") as f:
-        f.write("\n".join(sorted(list(combined_ips))))
+    # 排序数据
+    sorted_ips = sorted(list(combined_ips))
     
+    # 准备输出目录
     os.makedirs("output", exist_ok=True)
-    output_path = os.path.join("output", OUTPUT_FILENAME)
+    mrs_path = os.path.join("output", OUTPUT_MRS)
+    txt_path = os.path.join("output", OUTPUT_TXT)
 
+    # --- 1. 保存为 TXT 文件 ---
+    print(f">>> 正在保存文本文件: {txt_path}")
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted_ips))
+
+    # --- 2. 准备转换 MRS 的临时文件 ---
+    with open(TEMP_TXT, "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted_ips))
+    
+    # 路径探测
     cwd = os.getcwd()
     executable = "mihomo.exe" if sys.platform == "win32" else "mihomo"
     mihomo_path = os.path.join(cwd, executable)
@@ -68,23 +81,24 @@ def download_and_merge():
     if sys.platform != "win32":
         os.chmod(mihomo_path, 0o755)
 
-    print(f">>> 开始转换至 MRS: {output_path}")
+    # --- 3. 调用转换 MRS ---
+    print(f">>> 正在转换二进制 MRS: {mrs_path}")
     try:
-        # 【修正后的命令】
-        # 参数1: ipcidr (规则行为)
-        # 参数2: text (源文件格式，因为临时文件是纯文本列表)
         result = subprocess.run(
-            [mihomo_path, "convert-ruleset", "ipcidr", "text", TEMP_TXT, output_path],
+            [mihomo_path, "convert-ruleset", "ipcidr", "text", TEMP_TXT, mrs_path],
             capture_output=True,
             text=True,
             timeout=60
         )
         
         if result.returncode == 0:
-            size = os.path.getsize(output_path) / 1024
-            print(f">>> 成功！生成的 MRS 大小: {size:.2f} KB")
+            mrs_size = os.path.getsize(mrs_path) / 1024
+            txt_size = os.path.getsize(txt_path) / 1024
+            print(f">>> 成功！")
+            print(f"    - MRS 文件: {mrs_size:.2f} KB")
+            print(f"    - TXT 文件: {txt_size:.2f} KB")
         else:
-            print(f"!!! 转换失败 !!!\n错误详情: {result.stderr}")
+            print(f"!!! 转换失败 !!!\n{result.stderr}")
             sys.exit(result.returncode)
             
     except Exception as e:
