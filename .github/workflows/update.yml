@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write # 授予写权限
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -24,25 +24,25 @@ jobs:
       - name: Download Mihomo Kernel
         run: |
           echo "正在获取 Mihomo 下载链接..."
-          # 获取版本号
+          # 1. 获取最新 Alpha 版本号
           wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
           version=$(cat version.txt)
           
+          # 2. 下载对应的压缩包
           mihomo_tool="mihomo-linux-amd64-$version"
-          
           echo "下载文件: $mihomo_tool.gz"
           wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
           
-          # 解压
+          # 3. 解压文件
           gzip -d "$mihomo_tool.gz"
           
-          # 【关键修正】：重命名为 Python 脚本调用的 "mihomo"
+          # 4. 【关键步骤】重命名，否则 Python 脚本找不到文件
           mv "$mihomo_tool" mihomo
           
-          # 设置权限
+          # 5. 赋予执行权限
           chmod +x mihomo
           
-          echo "验证内核版本:"
+          echo "验证内核是否可用:"
           ./mihomo -v
 
       - name: Run Merge and Convert
@@ -53,14 +53,15 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 确保 output 目录存在并添加
+          # 确保输出目录被加入暂存区
           git add output/*.mrs || true
           
+          # 检查是否有变更需要提交
           if git diff --staged --quiet; then
             echo "没有发现规则更新，跳过推送。"
             exit 0
           fi
           
           echo "发现更新，准备推送..."
-          git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          git push
+          git commit -m "Auto Update Ruleset: $(date +'%Y-%m-%d %H:%M:%S')"
+          git push origin HEAD:main
