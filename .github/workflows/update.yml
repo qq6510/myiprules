@@ -8,13 +8,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 关键：授予写权限，解决 Exit Code 128
+      contents: write 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
@@ -24,24 +24,26 @@ jobs:
       - name: Download Mihomo Kernel
         run: |
           echo "正在获取 Mihomo 下载链接..."
-          
-          # 直接下载版本号文件
+          # 获取版本号
           wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
           version=$(cat version.txt)
           
-          # 动态拼接文件名
           mihomo_tool="mihomo-linux-amd64-$version"
           
-          # 下载 Mihomo
           echo "下载文件: $mihomo_tool.gz"
           wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
           
-          # 解压并设置权限
+          # 解压
           gzip -d "$mihomo_tool.gz"
-          chmod +x "$mihomo_tool"
           
-          # 验证
-          ./$mihomo_tool -v
+          # 【关键修正】：重命名为 Python 脚本调用的 "mihomo"
+          mv "$mihomo_tool" mihomo
+          
+          # 设置权限
+          chmod +x mihomo
+          
+          echo "验证内核版本:"
+          ./mihomo -v
 
       - name: Run Merge and Convert
         run: python convert.py
@@ -50,9 +52,10 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add output/*.mrs
           
-          # 检查是否有变更
+          # 确保 output 目录存在并添加
+          git add output/*.mrs || true
+          
           if git diff --staged --quiet; then
             echo "没有发现规则更新，跳过推送。"
             exit 0
@@ -60,4 +63,4 @@ jobs:
           
           echo "发现更新，准备推送..."
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          git push origin HEAD:main || git push origin HEAD:master
+          git push
