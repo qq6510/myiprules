@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史，避免 rebase 冲突
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,13 +49,22 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add output/* || true
+          # 1. 添加生成的 output 目录下所有文件 (.mrs 和 .txt)
+          git add output/*
           
+          # 2. 检查是否有内容变更
           if git diff --staged --quiet; then
             echo "没有规则更新，跳过推送。"
             exit 0
           fi
           
+          # 3. 提交变更
           echo "提交更新..."
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
+          
+          # 4. 在推送前拉取远程最新更改，防止 rejected 错误
+          # 使用 rebase 保持提交历史整洁
+          git pull --rebase origin main
+          
+          # 5. 推送回仓库
           git push origin HEAD:main
