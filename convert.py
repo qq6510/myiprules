@@ -7,9 +7,12 @@ import shutil
 
 # 配置需要合并的 IP 段网址
 URLS = [
-    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/amazon/ipv4_merged.txt",
-    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/microsoft/ipv4_merged.txt",
-    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4_merged.txt"
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/facebook/ipv4_merged.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4_merged.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/twitter/ipv4_merged.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/telegram/ipv4_merged.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/openai/ipv4_merged.txt",
+    "https://raw.githubusercontent.com/lord-alfred/ipranges/main/perplexity/ipv4_merged.txt"
 ]
 
 # 输出文件名配置
