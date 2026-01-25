@@ -1,21 +1,64 @@
-- name: Git Push
+name: Update Merged MRS
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # 获取完整历史，防止 git pull --rebase 失败
+          fetch-depth: 0 
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: Download Mihomo Kernel
         run: |
-          # 1. 检查文件是否真的存在，以及最后修改时间
-          ls -la output/
-          
+          wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
+          version=$(cat version.txt)
+          mihomo_tool="mihomo-linux-amd64-$version"
+          wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
+          gzip -d "$mihomo_tool.gz"
+          mv "$mihomo_tool" mihomo
+          chmod +x mihomo
+          ./mihomo -v
+
+      - name: Run Merge and Convert
+        run: python convert.py
+
+      - name: Git Push
+        run: |
+          # 配置环境
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 2. 强制添加文件，防止被 .gitignore 拦截
+          # 1. 强制添加文件（防止被 .gitignore 意外拦截导致 No changes）
           git add -f output/* || true
           
-          # 3. 打印当前 git 状态，看看到底哪些文件准备提交
-          git status
-          
+          # 2. 检查是否有实际变动
           if git diff --staged --quiet; then
-            echo "No changes detected in Git."
+            echo "Warning: No changes detected in output files. Skipping push."
             exit 0
           fi
+          
+          # 3. 提交变动
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          git pull --rebase origin main
+          
+          # 4. 解决 [rejected] 错误：拉取远程更新并变基
+          # 使用 -X theirs 策略：如果远程有人改了文件，以本次运行生成的新文件为准
+          git pull --rebase -X theirs origin main
+          
+          # 5. 推送
           git push origin HEAD:main
