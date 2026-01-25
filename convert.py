@@ -2,6 +2,7 @@ import requests
 import subprocess
 import os
 import ipaddress
+import sys
 
 # 配置需要合并的 IP 段网址
 URLS = [
@@ -57,12 +58,16 @@ def download_and_merge():
             
             print(f"  - 原始行数: {len(lines)} | 有效 IP 数: {valid_count}")
             
+        except requests.exceptions.Timeout:
+            print(f"  - 警告: 下载 {url} 超时")
+        except requests.exceptions.RequestException as e:
+            print(f"  - 警告: 无法下载 {url}, 错误: {e}")
         except Exception as e:
-            print(f"  - 警告: 无法下载或处理 {url}, 错误: {e}")
+            print(f"  - 警告: 处理 {url} 时出错, 错误: {e}")
 
     if not combined_ips:
         print("错误：没有提取到任何有效的 IP 地址，脚本终止。")
-        exit(1)
+        sys.exit(1)
 
     # 写入临时文件
     print(f">>> 正在合并并去重，共 {len(combined_ips)} 条规则...")
@@ -80,14 +85,18 @@ def download_and_merge():
 
     if not os.path.exists(mihomo_path):
         print("错误：找不到 mihomo 可执行文件")
-        exit(1)
+        print("请确保 mihomo 文件在当前目录中")
+        sys.exit(1)
+
+    # 确保有执行权限
+    os.chmod(mihomo_path, 0o755)
 
     try:
-        # 捕捉详细输出以便调试
         result = subprocess.run(
             [mihomo_path, "convert-ruleset", "ipcidr", TEMP_TXT, output_path],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=60
         )
         
         if result.returncode == 0:
@@ -97,10 +106,20 @@ def download_and_merge():
             print(f"文件大小: {size:.2f} KB")
         else:
             print(f"!!! 转换失败 (Exit Code {result.returncode}) !!!")
-            print("错误日志 (Stderr):")
-            print(result.stderr)
-            exit(result.returncode) # 让 Action 报错
+            if result.stdout:
+                print("标准输出:")
+                print(result.stdout)
+            if result.stderr:
+                print("错误输出:")
+                print(result.stderr)
+            sys.exit(result.returncode)
             
+    except subprocess.TimeoutExpired:
+        print("错误：转换超时（超过 60 秒）")
+        sys.exit(1)
+    except Exception as e:
+        print(f"错误：{e}")
+        sys.exit(1)
     finally:
         if os.path.exists(TEMP_TXT):
             os.remove(TEMP_TXT)
