@@ -4,11 +4,6 @@ on:
     - cron: '0 20 * * *'
   workflow_dispatch:
 
-# 建议添加并发控制，防止多个任务同时运行导致冲突
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -50,9 +45,6 @@ jobs:
             exit 0
           fi
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          
-          # --- 修复核心：先拉取远程更新，再推送 ---
+          # 最小化修改：推送前先合并远程变更
           git pull --rebase origin main
-          # -------------------------------------
-          
           git push origin HEAD:main
