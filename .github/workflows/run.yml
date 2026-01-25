@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 必须赋予写权限，否则无法 git push
+      contents: write # 授予写权限以便推送更新
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -16,33 +16,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: pip install requests
 
       - name: Download Mihomo Kernel
         run: |
-          echo "正在获取 Mihomo 下载链接..."
-          # 1. 获取最新 Alpha 版本号
+          echo "获取最新预览版版本号..."
           wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
           version=$(cat version.txt)
           
-          # 2. 下载对应的压缩包
           mihomo_tool="mihomo-linux-amd64-$version"
-          echo "下载文件: $mihomo_tool.gz"
+          echo "正在下载: $mihomo_tool.gz"
           wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
           
-          # 3. 解压文件
+          # 解压并标准化文件名
           gzip -d "$mihomo_tool.gz"
-          
-          # 4. 【关键步骤】必须改名为脚本中定义的 "mihomo"
           mv "$mihomo_tool" mihomo
-          
-          # 5. 赋予执行权限
           chmod +x mihomo
           
-          echo "验证内核是否可用:"
+          echo "内核验证:"
           ./mihomo -v
 
       - name: Run Merge and Convert
@@ -53,14 +47,13 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 添加生成的 mrs 文件
           git add output/*.mrs || true
           
-          # 检查是否有变更，没有变更则静默退出
           if git diff --staged --quiet; then
-            echo "没有发现规则更新，跳过推送。"
+            echo "没有规则更新，跳过推送。"
             exit 0
           fi
           
-          echo "发现更新，准备推送..."
-          git commit -m "Auto Update Ruleset: $(date +'%Y-%m-%d %H:%M:%S
+          echo "提交更新..."
+          git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
+          git push origin HEAD:main
