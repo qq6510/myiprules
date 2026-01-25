@@ -1,6 +1,6 @@
 项目简介：
 
-本项目旨在从多个来源（Facebook、GitHub、Twitter、Telegram、OpenAI、Perplexity）获取最新的 IPv4 地址段，并将这些 IP 段进行合并处理，最终生成适用于 Mihomo 格式的二进制文件。该文件可用于网络代理规则、访问控制或其他需要基于 IP 范围的应用场景。
+本项目旨在从多个来源（Facebook、GitHub、Twitter、Telegram、OpenAI、Perplexity）获取最新的 IP 地址段，并将这些 IP 段进行合并处理，最终生成适用于 Mihomo 格式的二进制文件。该文件可用于网络代理规则、访问控制或其他需要基于 IP 范围的应用场景。
 
 主要功能：
 
