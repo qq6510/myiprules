@@ -1,54 +1,21 @@
-name: Update Merged MRS
-on:
-  schedule:
-    - cron: '0 20 * * *'
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # 修改点 1：获取完整历史以支持合并
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
-        run: pip install requests
-
-      - name: Download Mihomo Kernel
+- name: Git Push
         run: |
-          wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
-          version=$(cat version.txt)
-          mihomo_tool="mihomo-linux-amd64-$version"
-          wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
-          gzip -d "$mihomo_tool.gz"
-          mv "$mihomo_tool" mihomo
-          chmod +x mihomo
-          ./mihomo -v
-
-      - name: Run Merge and Convert
-        run: python convert.py
-
-      - name: Git Push
-        run: |
+          # 1. 检查文件是否真的存在，以及最后修改时间
+          ls -la output/
+          
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add output/* || true
+          
+          # 2. 强制添加文件，防止被 .gitignore 拦截
+          git add -f output/* || true
+          
+          # 3. 打印当前 git 状态，看看到底哪些文件准备提交
+          git status
+          
           if git diff --staged --quiet; then
-            echo "No changes."
+            echo "No changes detected in Git."
             exit 0
           fi
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          
-          # 修改点 2：拉取时如果遇到文件冲突，优先使用本地新生成的版本
-          git pull --rebase -X theirs origin main
-          
+          git pull --rebase origin main
           git push origin HEAD:main
