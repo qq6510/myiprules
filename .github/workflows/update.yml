@@ -1,46 +1,52 @@
-name: Update Merged MRS
+name: 获取并处理数据
+
 on:
   schedule:
-    - cron: '0 20 * * *' # 北京时间凌晨 4 点执行
-  workflow_dispatch:      # 允许手动运行
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # 关键：授予写权限，解决 Exit Code 128
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.x'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Dependencies
-        run: pip install requests
-
-      - name: Download Mihomo Kernel
+      - name: 获取 Mihomo 下载链接
         run: |
           echo "正在获取 Mihomo 下载链接..."
           
-          # 使用更稳定的 API 方法
-          RELEASES=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases)
+          # 使用更稳定的 API 方法，获取最新版本信息
+          RELEASES=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest)
           
-          # 查找包含 linux-amd64-compatible 的版本
-          MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64-compatible\.gz"' | head -1 | cut -d'"' -f4)
+          # 尝试多种下载模式（按优先级）
+          # 1. 首先尝试 amd64-v1 (兼容性最好)
+          MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64-v1\.gz"' | head -1 | cut -d'"' -f4)
           
+          # 2. 如果找不到，尝试 amd64-v2
           if [ -z "$MIHOMO_URL" ]; then
-            echo "警告: Prerelease 版本未找到，尝试查找最新的 ARM64 或通用版本"
-            MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*amd64\.gz"' | head -1 | cut -d'"' -f4)
+            echo "提示: amd64-v1 版本未找到，尝试 amd64-v2..."
+            MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64-v2\.gz"' | head -1 | cut -d'"' -f4)
+          fi
+          
+          # 3. 如果还是找不到，尝试通用 amd64-compatible
+          if [ -z "$MIHOMO_URL" ]; then
+            echo "提示: amd64-v2 版本未找到，尝试 amd64-compatible..."
+            MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64-compatible\.gz"' | head -1 | cut -d'"' -f4)
+          fi
+          
+          # 4. 最后尝试通用 amd64
+          if [ -z "$MIHOMO_URL" ]; then
+            echo "提示: amd64-compatible 版本未找到，尝试通用 amd64..."
+            MIHOMO_URL=$(echo "$RELEASES" | grep -o '"browser_download_url":"[^"]*linux-amd64\.gz"' | head -1 | cut -d'"' -f4)
           fi
           
           if [ -z "$MIHOMO_URL" ]; then
             echo "错误：未能找到任何 Mihomo 下载链接！"
             exit 1
           fi
-
+          
           echo "下载地址: $MIHOMO_URL"
           curl -L -o mihomo.gz "$MIHOMO_URL"
           
@@ -53,23 +59,15 @@ jobs:
           chmod +x mihomo
           ./mihomo -v # 验证版本，确保下载成功
 
-      - name: Run Merge and Convert
-        run: python convert.py
-
-      - name: Git Push
+      - name: 获取IP规则列表并处理
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add output/*.mrs
-          
-          # 检查是否有变更
-          if git diff --staged --quiet; then
-            echo "没有发现规则更新，跳过推送。"
-            exit 0
-          fi
-          
-          echo "发现更新，准备推送..."
-          git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
-          
-          # 智能推送：尝试 main，如果失败则尝试 master
-          git push origin HEAD:main || git push origin HEAD:master
+          echo "Processing IP rules..."
+          # 这里添加你的IP规则处理逻辑
+
+      - name: 提交更改
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Automatic IP rules update" || echo "No changes to commit"
+          git push
