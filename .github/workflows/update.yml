@@ -2,7 +2,7 @@ name: Update Merged MRS
 
 on:
   schedule:
-    - cron: "15 7 * * *"  # 这对应北京时间 15:15
+    - cron: '0 20 * * *'
   workflow_dispatch:
 
 jobs:
