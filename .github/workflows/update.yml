@@ -1,9 +1,19 @@
 name: Update Merged MRS
 
 on:
+  # 1. 修正时区：UTC 12:00 = 北京时间 20:00
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '0 12 * * *'
+  
+  # 2. 保留手动触发
   workflow_dispatch:
+  
+  # 3. 新增 Push 触发：强制让 GitHub 调度器识别此任务
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/update.yml'
 
 jobs:
   build:
