@@ -1,4 +1,5 @@
 name: Update Merged MRS
+
 on:
   schedule:
     - cron: '10 6 * * *'
