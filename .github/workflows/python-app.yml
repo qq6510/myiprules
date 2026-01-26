@@ -2,7 +2,7 @@ name: Update Merged MRS
 
 on:
   schedule:
-    - cron: "45 15 * * *"
+    - cron: "40 6 * * *"
   workflow_dispatch:
 
 jobs:
