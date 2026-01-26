@@ -3,7 +3,7 @@ name: Update Merged MRS
 on:
   # 1. 修正时区：UTC 12:00 = 北京时间 20:00
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '30 8 * * *'
   
   # 2. 保留手动触发
   workflow_dispatch:
