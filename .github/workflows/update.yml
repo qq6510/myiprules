@@ -1,19 +1,17 @@
 name: Update Merged MRS
 
 on:
-  # 1. 修正时区：UTC 12:00 = 北京时间 20:00
   schedule:
-    - cron: '11 9 * * *'
-  
-  # 2. 保留手动触发
+    - cron: '11 18 * * *'
   workflow_dispatch:
-  
-  # 3. 新增 Push 触发：强制让 GitHub 调度器识别此任务
   push:
     branches:
       - main
     paths:
       - '.github/workflows/update.yml'
+
+env:
+  TZ: Asia/Hong_Kong
 
 jobs:
   build:
@@ -24,7 +22,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # 获取完整历史，防止 git pull --rebase 失败
           fetch-depth: 0 
 
       - name: Set up Python
@@ -51,25 +48,18 @@ jobs:
 
       - name: Git Push
         run: |
-          # 配置环境
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 1. 强制添加文件（防止被 .gitignore 意外拦截导致 No changes）
           git add -f output/* || true
           
-          # 2. 检查是否有实际变动
           if git diff --staged --quiet; then
             echo "Warning: No changes detected in output files. Skipping push."
             exit 0
           fi
           
-          # 3. 提交变动
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
           
-          # 4. 解决 [rejected] 错误：拉取远程更新并变基
-          # 使用 -X theirs 策略：如果远程有人改了文件，以本次运行生成的新文件为准
           git pull --rebase -X theirs origin main
           
-          # 5. 推送
           git push origin HEAD:main
