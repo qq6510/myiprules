@@ -34,13 +34,26 @@ jobs:
 
       - name: Download Mihomo Kernel
         run: |
-          wget -q https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt
-          version=$(cat version.txt)
-          mihomo_tool="mihomo-linux-amd64-$version"
-          wget -q "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/$mihomo_tool.gz"
-          gzip -d "$mihomo_tool.gz"
-          mv "$mihomo_tool" mihomo
+          # 下载 DustinWin 提供的 mihomo 内核 (v3 架构)
+          # 注意：源文件是 .tar.gz 格式
+          wget -q -O mihomo.tar.gz https://github.com/DustinWin/proxy-tools/releases/download/mihomo/mihomo-meta-linux-amd64v3.tar.gz
+          
+          # 解压文件
+          tar -zxf mihomo.tar.gz
+          
+          # DustinWin 的包解压后文件名为 CrashCore，需要重命名为 mihomo
+          if [ -f "CrashCore" ]; then
+            mv CrashCore mihomo
+          else
+            echo "Error: CrashCore file not found in archive!"
+            exit 1
+          fi
+          
+          # 赋予执行权限并清理
           chmod +x mihomo
+          rm -f mihomo.tar.gz
+          
+          # 验证版本
           ./mihomo -v
 
       - name: Run Merge and Convert
