@@ -10,9 +10,6 @@ on:
     paths:
       - '.github/workflows/update.yml'
 
-env:
-  TZ: Asia/Hong_Kong
-
 jobs:
   build:
     runs-on: ubuntu-latest
