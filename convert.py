@@ -2,9 +2,7 @@ import requests
 import subprocess
 import os
 import ipaddress
-import sys
 
-# IPv4 和 IPv6 源地址配置
 URLS_IPV4 = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/facebook/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4.txt",
@@ -23,7 +21,6 @@ URLS_IPV6 = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/perplexity/ipv6.txt"
 ]
 
-# 输出文件名配置
 OUTPUT_DIR = "output"
 OUTPUT_IPV4_TXT = "merged_ipv4.txt"
 OUTPUT_IPV4_MRS = "merged_ipv4.mrs"
@@ -78,26 +75,22 @@ def save_and_convert(networks, txt_file, mrs_file, temp_file):
     txt_path = os.path.join(OUTPUT_DIR, txt_file)
     mrs_path = os.path.join(OUTPUT_DIR, mrs_file)
 
-    # 保存 TXT 文件
     print(f">>> 写入文本文件: {txt_path}")
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(sorted_ips))
 
-    # 临时文件用于转换
     with open(temp_file, "w", encoding="utf-8") as f:
         f.write("\n".join(sorted_ips))
 
-    # 调用 Mihomo 转换
     cwd = os.getcwd()
-    executable = "mihomo.exe" if sys.platform == "win32" else "mihomo"
+    executable = "mihomo"
     mihomo_path = os.path.join(cwd, executable)
 
     if not os.path.exists(mihomo_path):
         print(f"错误：在当前目录下未找到可执行文件 {executable}")
         return
 
-    if sys.platform != "win32":
-        os.chmod(mihomo_path, 0o755)
+    os.chmod(mihomo_path, 0o755)
 
     print(f">>> 正在调用内核生成二进制 MRS: {mrs_path}")
     try:
