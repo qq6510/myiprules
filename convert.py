@@ -6,6 +6,7 @@ import ipaddress
 URLS_IPV4 = [
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/facebook/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/github/ipv4.txt",
+    "https://raw.githubusercontent.com/DustinWin/ruleset_geodata/refs/heads/mihomo-ruleset/mediaip.list",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/twitter/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/telegram/ipv4.txt",
     "https://raw.githubusercontent.com/lord-alfred/ipranges/main/openai/ipv4.txt",
