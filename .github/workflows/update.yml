@@ -17,12 +17,12 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@main  # 修改处 1：由 @v4 改为 @main
         with:
           fetch-depth: 0 
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@main  # 修改处 2：由 @v5 改为 @main
         with:
           python-version: '3.x'
 
