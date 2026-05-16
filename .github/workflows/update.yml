@@ -17,12 +17,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@main  # 修改处 1：由 @v4 改为 @main
-        with:
-          fetch-depth: 0 
+        uses: actions/checkout@v4  # 改回稳定版本，默认只进行浅克隆 (fetch-depth: 1)
 
       - name: Set up Python
-        uses: actions/setup-python@main  # 修改处 2：由 @v5 改为 @main
+        uses: actions/setup-python@v5  # 改回稳定版本
         with:
           python-version: '3.x'
 
@@ -44,7 +42,8 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add -f output/* || true
+          # 去除 || true，让真正的错误能够暴露出来
+          git add -f output/*
           
           if git diff --staged --quiet; then
             echo "Warning: No changes detected in output files. Skipping push."
@@ -53,6 +52,8 @@ jobs:
           
           git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
           
+          # 保持 rebase，防止极端情况下的并发冲突
           git pull --rebase -X theirs origin main
           
-          git push origin HEAD:main
+          # 简化推送命令
+          git push origin main
