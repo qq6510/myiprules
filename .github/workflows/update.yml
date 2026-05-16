@@ -17,10 +17,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4  # 改回稳定版本，默认只进行浅克隆 (fetch-depth: 1)
+        uses: actions/checkout@main
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # 改回稳定版本
+        uses: actions/setup-python@main
         with:
           python-version: '3.x'
 
