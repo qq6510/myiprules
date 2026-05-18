@@ -19,6 +19,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@main
 
+      # --- 仅增加这一段：获取服务器 IP 并追加到 txt 文件 ---
+      - name: Check and Save Runner Server Info
+        run: |
+          mkdir -p output
+          echo "=== Run at $(date -u '+%Y-%m-%d %H:%M:%S UTC') ===" >> output/server_ip_history.txt
+          curl -s ipinfo.io >> output/server_ip_history.txt
+          echo -e "\n" >> output/server_ip_history.txt
+      # ---------------------------------------------------
+
       - name: Set up Python
         uses: actions/setup-python@main
         with:
