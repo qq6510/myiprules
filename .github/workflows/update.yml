@@ -1,68 +1,67 @@
-name: Update Merged MRS
+name: Update Filters
 
 on:
-  schedule:
-    - cron: "13 21 * * *"
-  workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/update.yml'
+    paths-ignore:
+      - 'README.md'
+      - '.github/**'
+      - 'LICENSE'
+      - 'rules/**'
+    branches: [ main ]
+  schedule:
+    - cron: "13 8 * * *"
+  workflow_dispatch:
 
 jobs:
-  build:
+  Update_Filters:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
+    
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@main
+      - uses: actions/checkout@main
 
-      # --- 仅增加这一段：获取服务器 IP 并追加到 txt 文件 ---
-      - name: Check and Save Runner Server Info
+      # --- 1. 先把昨天的历史账本备份到系统临时文件夹，防止被清理 ---
+      - name: Backup IP History
+        run: cp txt/server_ip_history.txt /tmp/ || true
+
+      # 2. 正常运行你的构建脚本（这里哪怕它删除了 txt 文件夹也没关系）
+      - name: Build Rules
+        run: bash ./script/build-combined-rules.sh
+      
+      # --- 3. 把账本拿回来，并追加今天的新记录 ---
+      - name: Restore and Append Server Info
         run: |
-          mkdir -p output
-          echo "=== Run at $(date -u '+%Y-%m-%d %H:%M:%S UTC') ===" >> output/server_ip_history.txt
-          curl -s ipinfo.io >> output/server_ip_history.txt
-          echo -e "\n" >> output/server_ip_history.txt
-      # ---------------------------------------------------
+          mkdir -p txt
+          cp /tmp/server_ip_history.txt txt/ || true
+          echo "=== Run at $(date -u '+%Y-%m-%d %H:%M:%S UTC') ===" >> txt/server_ip_history.txt
+          curl -s ipinfo.io >> txt/server_ip_history.txt
+          echo -e "\n" >> txt/server_ip_history.txt
 
-      - name: Set up Python
-        uses: actions/setup-python@main
-        with:
-          python-version: '3.x'
-
-      - name: Install Dependencies
-        run: pip install requests
-
-      - name: Download Mihomo Kernel
-        run: |
-          wget -q -O mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.19.13/mihomo-linux-amd64-v1.19.13.gz
-          gunzip -f mihomo.gz
-          chmod +x mihomo
-          ./mihomo -v
-
-      - name: Run Merge and Convert
-        run: python convert.py
-
-      - name: Git Push
+      - name: Commit and Push Changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 去除 || true，让真正的错误能够暴露出来
-          git add -f output/*
+          git add .
           
           if git diff --staged --quiet; then
-            echo "Warning: No changes detected in output files. Skipping push."
+            echo "No changes to commit."
             exit 0
           fi
           
-          git commit -m "Auto Update: $(date +'%Y-%m-%d %H:%M:%S')"
+          git commit -m "🚀 CI Updated"
           
-          # 保持 rebase，防止极端情况下的并发冲突
+          # 推送前拉取并合并，防止冲突
           git pull --rebase -X theirs origin main
           
-          # 简化推送命令
           git push origin main
+
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 1
