@@ -11,3 +11,16 @@
   "readme": "https://ipinfo.io/missingauth"
 }
 
+=== Run at 2026-05-18 10:53:51 UTC ===
+{
+  "ip": "172.208.153.211",
+  "city": "Cheyenne",
+  "region": "Wyoming",
+  "country": "US",
+  "loc": "41.1400,-104.8203",
+  "org": "AS8075 Microsoft Corporation",
+  "postal": "82002",
+  "timezone": "America/Denver",
+  "readme": "https://ipinfo.io/missingauth"
+}
+
