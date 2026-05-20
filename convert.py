@@ -3,6 +3,7 @@ import subprocess
 import os
 import ipaddress
 import sys
+from concurrent.futures import ThreadPoolExecutor  # 引入线程池实现并发
 
 # 提取公共变量，方便后续维护
 SERVICES = ["facebook", "github", "twitter", "telegram", "openai", "perplexity"]
@@ -32,24 +33,41 @@ def clean_and_validate_ip(line):
     except ValueError:
         return None
 
+def _fetch_single_url(url):
+    """单条 URL 下载线程函数"""
+    try:
+        resp = requests.get(url, timeout=20)
+        resp.raise_for_status()
+        return url, resp.text
+    except Exception as e:
+        return url, e
+
 def download_and_merge(urls):
     raw_networks = []
-    print(">>> 正在从远程源下载数据...")
-    for url in urls:
-        print(f"  正在请求: {url}")
-        try:
-            resp = requests.get(url, timeout=20)
-            resp.raise_for_status()
+    print(">>> 正在从远程源并发下载数据...")
+    
+    # 优化点：使用线程池并发请求所有 URL，最大线程数匹配 URL 数量
+    max_workers = min(len(urls), 8)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # map 会按输入顺序返回结果
+        results = executor.map(_fetch_single_url, urls)
             
-            count = 0
-            for line in resp.text.splitlines():
-                net = clean_and_validate_ip(line)
-                if net:
-                    raw_networks.append(net)
-                    count += 1
-            print(f"    - 成功提取 {count} 条记录")
-        except Exception as e:
-            print(f"    - 警告: 处理失败 {url}, 错误: {e}")
+    for url, output in results:
+        # 从 URL 中提取服务名称（如 facebook），让日志更清爽
+        svc_name = url.split('/')[-2]
+        
+        if isinstance(output, Exception):
+            print(f"    - 警告: [{svc_name}] 下载失败, 错误: {output}")
+            continue
+            
+        count = 0
+        for line in output.splitlines():
+            net = clean_and_validate_ip(line)
+            if net:
+                raw_networks.append(net)
+                count += 1
+        print(f"    - 成功提取 [{svc_name}]: {count} 条记录")
+        
     return raw_networks
 
 def save_and_convert(networks, txt_file, mrs_file, mihomo_path):
@@ -58,6 +76,7 @@ def save_and_convert(networks, txt_file, mrs_file, mihomo_path):
         return
 
     print(">>> 正在进行 CIDR 聚合与精简算法...")
+    # collapse_addresses 核心：自动将连续的、重叠的网段合并（例如 192.168.1.0/24 和 192.168.0.0/24 合并为 /23）
     collapsed_networks = list(ipaddress.collapse_addresses(networks))
     sorted_ips = [str(net) for net in collapsed_networks]
 
@@ -74,7 +93,6 @@ def save_and_convert(networks, txt_file, mrs_file, mihomo_path):
 
     print(f">>> 正在调用内核生成二进制 MRS: {mrs_path}")
     try:
-        # 直接使用 txt_path 作为输入，舍弃 temp_file
         result = subprocess.run(
             [mihomo_path, "convert-ruleset", "ipcidr", "text", txt_path, mrs_path],
             capture_output=True,
@@ -96,7 +114,7 @@ def check_mihomo():
     mihomo_path = os.path.join(os.getcwd(), "mihomo")
     if not os.path.exists(mihomo_path):
         print(f"致命错误：在当前目录下未找到可执行文件 mihomo")
-        sys.exit(1) # 找不到工具直接退出，避免浪费网络请求
+        sys.exit(1)
     os.chmod(mihomo_path, 0o755)
     return mihomo_path
 
