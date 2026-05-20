@@ -28,11 +28,7 @@ jobs:
           echo -e "\n" >> output/server_ip_history.txt
       # ---------------------------------------------------
 
-      - name: Set up Python
-        uses: actions/setup-python@main
-        with:
-          python-version: '3.x'
-
+      # 【仅修改此处】删除了整个 Set up Python 步骤，直接利用 ubuntu-latest 镜像中自带的 Python 环境
       - name: Install Dependencies
         run: pip install requests
 
