@@ -768,3 +768,16 @@
   "readme": "https://ipinfo.io/missingauth"
 }
 
+=== Run at 2026-07-11 22:07:23 UTC ===
+{
+  "ip": "20.169.93.112",
+  "city": "Phoenix",
+  "region": "Arizona",
+  "country": "US",
+  "loc": "33.4484,-112.0740",
+  "org": "AS8075 Microsoft Corporation",
+  "postal": "85003",
+  "timezone": "America/Phoenix",
+  "readme": "https://ipinfo.io/missingauth"
+}
+
