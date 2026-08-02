@@ -9,15 +9,13 @@ from concurrent.futures import ThreadPoolExecutor  # 引入线程池实现并发
 # 新增：将 QuixoticHeart/rule-set 中的 gfw.list（包含多服务 IPv4/IPv6 列表）的 raw 链接
 # 我使用了该文件的具体 commit OID 来确保引用固定版本（避免主分支变动导致内容不稳定）
 PREVIOUS_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/f2917bd3eff4e2d8823f7d154bce885ca5c43b6e/meta/ipcidr/gfw.list"
-# 新增 proxy.list（同一 commit OID）
-PROXY_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/f2917bd3eff4e2d8823f7d154bce885ca5c43b6e/meta/ipcidr/proxy.list"
 
 SERVICES = ["facebook", "github", "twitter", "telegram", "openai", "perplexity"]
 BASE_URL = "https://raw.githubusercontent.com/lord-alfred/ipranges/main/{}/{}.txt"
 
-# 将 PREVIOUS_URL 和 PROXY_URL 放在每个 URL 列表的最前面（保证优先使用）
-URLS_IPV4 = [PREVIOUS_URL, PROXY_URL] + [BASE_URL.format(svc, "ipv4") for svc in SERVICES]
-URLS_IPV6 = [PREVIOUS_URL, PROXY_URL] + [BASE_URL.format(svc, "ipv6") for svc in SERVICES]
+# 将 PREVIOUS_URL 放在每个 URL 列表的最前面（保证优先使用）
+URLS_IPV4 = [PREVIOUS_URL] + [BASE_URL.format(svc, "ipv4") for svc in SERVICES]
+URLS_IPV6 = [PREVIOUS_URL] + [BASE_URL.format(svc, "ipv6") for svc in SERVICES]
 
 OUTPUT_DIR = "output"
 OUTPUT_IPV4_TXT = "merged_ipv4.txt"
@@ -81,6 +79,20 @@ def save_and_convert(networks, txt_file, mrs_file, mihomo_path):
     if not networks:
         print(f"错误：未获取到任何有效 IP 数据，跳过 {txt_file}")
         return
+
+    # 根据目标文件名判断要处理的 IP 版本（IPv4/IPv6），并过滤掉非目标版本的网段
+    target_version = None
+    if 'ipv4' in txt_file.lower():
+        target_version = 4
+    elif 'ipv6' in txt_file.lower():
+        target_version = 6
+
+    if target_version is not None:
+        filtered_networks = [n for n in networks if getattr(n, 'version', None) == target_version]
+        if not filtered_networks:
+            print(f"错误：未获取到任何有效 IPv{target_version} 数据，跳过 {txt_file}")
+            return
+        networks = filtered_networks
 
     print(">>> 正在进行 CIDR 聚合与精简算法...")
     # collapse_addresses 核心：自动将连续的、重叠的网段合并（例如 192.168.1.0/24 和 192.168.0.0/24 合并为 /23）
