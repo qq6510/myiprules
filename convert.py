@@ -19,14 +19,19 @@ OUTPUT_IPV4_TXT = "merged_ipv4.txt"
 OUTPUT_IPV4_MRS = "merged_ipv4.mrs"
 OUTPUT_IPV6_TXT = "merged_ipv6.txt"
 OUTPUT_IPV6_MRS = "merged_ipv6.mrs"
+OUTPUT_ALL_TXT = "merged_all.txt"
+OUTPUT_ALL_MRS = "merged_all.mrs"
 
-# 2. 线程局部变量：为每个线程创建安全的专属 Session
+# 2. 线程局部变量
 thread_local = threading.local()
 
 def get_thread_session() -> requests.Session:
-    """获取线程独立的 Session，配置连接池与重试策略"""
+    """获取线程独立的 Session 并配置 Header 与连接池"""
     if not hasattr(thread_local, "session"):
         session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        })
         adapter = HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=2)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
@@ -35,32 +40,54 @@ def get_thread_session() -> requests.Session:
 
 def check_mihomo() -> str:
     """检查并配置 mihomo 内核"""
-    mihomo_path = os.path.join(os.getcwd(), "mihomo")
+    exec_name = "mihomo.exe" if sys.platform == "win32" else "mihomo"
+    mihomo_path = os.path.join(os.getcwd(), exec_name)
     if not os.path.exists(mihomo_path):
-        print("致命错误：当前目录下未找到可执行文件 mihomo")
+        print(f"致命错误：当前目录下未找到可执行文件 {exec_name}")
         sys.exit(1)
-    os.chmod(mihomo_path, 0o755)
+    if sys.platform != "win32":
+        os.chmod(mihomo_path, 0o755)
     return mihomo_path
 
 def clean_and_validate_ip(line: str):
-    """极致裁切注释并转换为 ip_network 对象"""
-    # 利用 partition 替代 split，不产生多余列表，速度更快
-    clean_line = line.partition('#')[0].partition(';')[0].strip()
+    """
+    清洗并解析 IP/CIDR，增加 Fast-Path 预检避免高开销异常
+    """
+    # 截断注释符 (#, ;, //)
+    for comment_symbol in ('#', ';', '//'):
+        if comment_symbol in line:
+            line = line.split(comment_symbol, 1)[0]
+
+    clean_line = line.strip().lstrip('-+* ').strip("'\"")
     if not clean_line:
         return None
+
+    # 处理 Clash 逗号分隔格式 (如 IP-CIDR,1.1.1.1/32,no-resolve)
+    if ',' in clean_line:
+        parts = [p.strip("'\" ") for p in clean_line.split(',')]
+        for part in parts:
+            if '.' in part or ':' in part:
+                try:
+                    return ipaddress.ip_network(part, strict=False)
+                except ValueError:
+                    continue
+        return None
+
+    # Fast-Path 预检：若不含 . 或 :，绝对不是合法 IP，直接跳过避免抛出异常
+    if '.' not in clean_line and ':' not in clean_line:
+        return None
+
     try:
         return ipaddress.ip_network(clean_line, strict=False)
     except ValueError:
         return None
 
 def fetch_and_categorize(urls: Set[str]) -> Tuple[Set[ipaddress.IPv4Network], Set[ipaddress.IPv6Network]]:
-    """
-    并发下载所有 URL，并在解析时利用 Set 进行 $O(1)$ 级别即时去重
-    """
+    """并发下载并高效归类"""
     ipv4_networks: Set[ipaddress.IPv4Network] = set()
     ipv6_networks: Set[ipaddress.IPv6Network] = set()
 
-    print(f">>> 开始并发拉取 {len(urls)} 个规则源 (请求已去重)...")
+    print(f">>> 开始并发拉取 {len(urls)} 个规则源...")
 
     def _fetch(url: str):
         session = get_thread_session()
@@ -83,46 +110,36 @@ def fetch_and_categorize(urls: Set[str]) -> Tuple[Set[ipaddress.IPv4Network], Se
             print(f"    - 警告: [{label}] 下载失败: {output}")
             continue
 
-        v4_add, v6_add = 0, 0
+        v4_before = len(ipv4_networks)
+        v6_before = len(ipv6_networks)
+
         for line in output.splitlines():
             net = clean_and_validate_ip(line)
             if net:
                 if net.version == 4:
-                    if net not in ipv4_networks:
-                        ipv4_networks.add(net)
-                        v4_add += 1
+                    ipv4_networks.add(net)
                 elif net.version == 6:
-                    if net not in ipv6_networks:
-                        ipv6_networks.add(net)
-                        v6_add += 1
+                    ipv6_networks.add(net)
 
-        print(f"    - [{label}] 新增有效唯一网段: IPv4={v4_add} 个, IPv6={v6_add} 个")
+        v4_added = len(ipv4_networks) - v4_before
+        v6_added = len(ipv6_networks) - v6_before
+        print(f"    - [{label}] 新增有效唯一网段: IPv4={v4_added} 个, IPv6={v6_added} 个")
 
     return ipv4_networks, ipv6_networks
 
-def process_and_convert(networks: Set[ipaddress._BaseNetwork], txt_file: str, mrs_file: str, mihomo_bin: str):
-    """CIDR 聚合与 MRS 转换"""
-    if not networks:
+def save_and_convert(lines: List[str], txt_file: str, mrs_file: str, mihomo_bin: str):
+    """直接接收格式化好的字符串列表并写入文件，调用 Mihomo 转换"""
+    if not lines:
         print(f"警告：[{txt_file}] 无有效数据，跳过生成。")
         return
-
-    raw_count = len(networks)
-    print(f"\n>>> 正在对 [{txt_file}] 进行 CIDR 聚合合并 (去重后待处理数: {raw_count})...")
-
-    # 预先去重后，collapse_addresses 的计算负担大幅减轻
-    collapsed_networks = list(ipaddress.collapse_addresses(networks))
-    final_count = len(collapsed_networks)
-
-    print(f"  - 原始输入总数 (去重后): {raw_count}")
-    print(f"  - 聚合精简后总数: {final_count} (进一步规约合并了 {raw_count - final_count} 个重叠网段)")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     txt_path = os.path.join(OUTPUT_DIR, txt_file)
     mrs_path = os.path.join(OUTPUT_DIR, mrs_file)
 
-    # 写入文件
+    print(f"\n>>> 写入文件 [{txt_path}] (总计 {len(lines)} 条记录)...")
     with open(txt_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(str(net) for net in collapsed_networks))
+        f.writelines(f"{line}\n" for line in lines)
 
     print(f">>> 调用 Mihomo 生成 MRS: {mrs_path}")
     try:
@@ -152,8 +169,21 @@ if __name__ == "__main__":
     # 下载并分类去重
     ipv4_nets, ipv6_nets = fetch_and_categorize(target_urls)
 
-    # 聚合转换
-    process_and_convert(ipv4_nets, OUTPUT_IPV4_TXT, OUTPUT_IPV4_MRS, mihomo_bin)
-    process_and_convert(ipv6_nets, OUTPUT_IPV6_TXT, OUTPUT_IPV6_MRS, mihomo_bin)
+    # 1. CIDR 聚合精简并一次性转换为字符串列表
+    print("\n>>> 正在对 IPv4 进行 CIDR 聚合精简...")
+    lines_v4 = [str(net) for net in ipaddress.collapse_addresses(ipv4_nets)]
+    print(f"    IPv4 原始: {len(ipv4_nets)} 条 -> 聚合后: {len(lines_v4)} 条")
+
+    print("\n>>> 正在对 IPv6 进行 CIDR 聚合精简...")
+    lines_v6 = [str(net) for net in ipaddress.collapse_addresses(ipv6_nets)]
+    print(f"    IPv6 原始: {len(ipv6_nets)} 条 -> 聚合后: {len(lines_v6)} 条")
+
+    # 2. 生成单协议产物
+    save_and_convert(lines_v4, OUTPUT_IPV4_TXT, OUTPUT_IPV4_MRS, mihomo_bin)
+    save_and_convert(lines_v6, OUTPUT_IPV6_TXT, OUTPUT_IPV6_MRS, mihomo_bin)
+
+    # 3. 零成本生成双栈产物（直接复用已生成的字符串列表，无需再次格式化）
+    lines_all = lines_v4 + lines_v6
+    save_and_convert(lines_all, OUTPUT_ALL_TXT, OUTPUT_ALL_MRS, mihomo_bin)
 
     print("\n>>> 全部作业处理完成！")
