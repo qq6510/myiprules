@@ -10,7 +10,7 @@ from requests.adapters import HTTPAdapter
 
 # 1. 基础配置
 PREVIOUS_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/ruleset/meta/ipcidr/gfw.list"
-PREVIOUS_PROXY_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/meta/ipcidr/proxy.list"
+PREVIOUS_PROXY_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/ruleset/meta/ipcidr/proxy.list"
 SERVICES = ["facebook", "github", "twitter", "telegram", "openai", "perplexity"]
 BASE_URL = "https://raw.githubusercontent.com/lord-alfred/ipranges/main/{}/{}.txt"
 
