@@ -6,11 +6,16 @@ import sys
 from concurrent.futures import ThreadPoolExecutor  # 引入线程池实现并发
 
 # 提取公共变量，方便后续维护
+# 新增：将 QuixoticHeart/rule-set 中的 gfw.list（包含多服务 IPv4/IPv6 列表）的 raw 链接
+# 我使用了该文件的具体 commit OID 来确保引用固定版本（避免主分支变动导致内容不稳定）
+PREVIOUS_URL = "https://raw.githubusercontent.com/QuixoticHeart/rule-set/f2917bd3eff4e2d8823f7d154bce885ca5c43b6e/meta/ipcidr/gfw.list"
+
 SERVICES = ["facebook", "github", "twitter", "telegram", "openai", "perplexity"]
 BASE_URL = "https://raw.githubusercontent.com/lord-alfred/ipranges/main/{}/{}.txt"
 
-URLS_IPV4 = [BASE_URL.format(svc, "ipv4") for svc in SERVICES]
-URLS_IPV6 = [BASE_URL.format(svc, "ipv6") for svc in SERVICES]
+# 将 PREVIOUS_URL 放在每个 URL 列表的最前面（保证优先使用）
+URLS_IPV4 = [PREVIOUS_URL] + [BASE_URL.format(svc, "ipv4") for svc in SERVICES]
+URLS_IPV6 = [PREVIOUS_URL] + [BASE_URL.format(svc, "ipv6") for svc in SERVICES]
 
 OUTPUT_DIR = "output"
 OUTPUT_IPV4_TXT = "merged_ipv4.txt"
