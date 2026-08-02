@@ -51,21 +51,23 @@ def check_mihomo() -> str:
 
 def clean_and_validate_ip(line: str):
     """
-    清洗并解析 IP/CIDR，增加 Fast-Path 预检避免高开销异常
+    清洗并解析 IP/CIDR，极致优化字符串切片与 Fast-Path 预检
     """
     # 截断注释符 (#, ;, //)
     for comment_symbol in ('#', ';', '//'):
-        if comment_symbol in line:
-            line = line.split(comment_symbol, 1)[0]
+        pos = line.find(comment_symbol)
+        if pos != -1:
+            line = line[:pos]
 
-    clean_line = line.strip().lstrip('-+* ').strip("'\"")
+    # 单次剥离所有前导/后导空白、引号及 YAML 符号
+    clean_line = line.strip(" \t\r\n-+*\'\"")
     if not clean_line:
         return None
 
     # 处理 Clash 逗号分隔格式 (如 IP-CIDR,1.1.1.1/32,no-resolve)
     if ',' in clean_line:
-        parts = [p.strip("'\" ") for p in clean_line.split(',')]
-        for part in parts:
+        for part in clean_line.split(','):
+            part = part.strip(" \t\r\n\'\"")
             if '.' in part or ':' in part:
                 try:
                     return ipaddress.ip_network(part, strict=False)
@@ -73,7 +75,7 @@ def clean_and_validate_ip(line: str):
                     continue
         return None
 
-    # Fast-Path 预检：若不含 . 或 :，绝对不是合法 IP，直接跳过避免抛出异常
+    # Fast-Path 预检：不含 . 或 : 则绝对不是合法 IP，跳过异常处理
     if '.' not in clean_line and ':' not in clean_line:
         return None
 
@@ -83,7 +85,7 @@ def clean_and_validate_ip(line: str):
         return None
 
 def fetch_and_categorize(urls: Set[str]) -> Tuple[Set[ipaddress.IPv4Network], Set[ipaddress.IPv6Network]]:
-    """并发下载并高效归类"""
+    """并发下载所有规则源，解析并归类"""
     ipv4_networks: Set[ipaddress.IPv4Network] = set()
     ipv6_networks: Set[ipaddress.IPv6Network] = set()
 
@@ -127,8 +129,9 @@ def fetch_and_categorize(urls: Set[str]) -> Tuple[Set[ipaddress.IPv4Network], Se
 
     return ipv4_networks, ipv6_networks
 
-def save_and_convert(lines: List[str], txt_file: str, mrs_file: str, mihomo_bin: str):
-    """直接接收格式化好的字符串列表并写入文件，调用 Mihomo 转换"""
+def save_and_convert_single_task(task_args: Tuple[List[str], str, str, str]):
+    """单任务保存 TXT 并调用 Mihomo 转换为 MRS"""
+    lines, txt_file, mrs_file, mihomo_bin = task_args
     if not lines:
         print(f"警告：[{txt_file}] 无有效数据，跳过生成。")
         return
@@ -137,11 +140,10 @@ def save_and_convert(lines: List[str], txt_file: str, mrs_file: str, mihomo_bin:
     txt_path = os.path.join(OUTPUT_DIR, txt_file)
     mrs_path = os.path.join(OUTPUT_DIR, mrs_file)
 
-    print(f"\n>>> 写入文件 [{txt_path}] (总计 {len(lines)} 条记录)...")
+    # 利用 C 底层的 join 实现单次高性能写盘
     with open(txt_path, "w", encoding="utf-8") as f:
-        f.writelines(f"{line}\n" for line in lines)
+        f.write("\n".join(lines) + "\n")
 
-    print(f">>> 调用 Mihomo 生成 MRS: {mrs_path}")
     try:
         result = subprocess.run(
             [mihomo_bin, "convert-ruleset", "ipcidr", "text", txt_path, mrs_path],
@@ -150,26 +152,25 @@ def save_and_convert(lines: List[str], txt_file: str, mrs_file: str, mihomo_bin:
             timeout=60
         )
         if result.returncode == 0:
-            print(f"    - [TXT] {txt_file}: {os.path.getsize(txt_path)/1024:.2f} KB")
-            print(f"    - [MRS] {mrs_file}: {os.path.getsize(mrs_path)/1024:.2f} KB")
+            print(f"    - [OK] {txt_file} ({os.path.getsize(txt_path)/1024:.1f} KB) -> {mrs_file} ({os.path.getsize(mrs_path)/1024:.1f} KB)")
         else:
-            print(f"!!! 转换失败 (Exit Code {result.returncode}) !!!\n{result.stderr}")
+            print(f"!!! [{mrs_file}] 转换失败 (Exit Code {result.returncode}) !!!\n{result.stderr}")
     except Exception as e:
-        print(f"运行异常: {e}")
+        print(f"运行 [{mrs_file}] 异常: {e}")
 
 if __name__ == "__main__":
     mihomo_bin = check_mihomo()
 
-    # 构建并去重 URL 集合
+    # 1. 构建去重 URL 集合
     target_urls: Set[str] = {PREVIOUS_URL, PREVIOUS_PROXY_URL}
     for svc in SERVICES:
         target_urls.add(BASE_URL.format(svc, "ipv4"))
         target_urls.add(BASE_URL.format(svc, "ipv6"))
 
-    # 下载并分类去重
+    # 2. 并发拉取与分类去重
     ipv4_nets, ipv6_nets = fetch_and_categorize(target_urls)
 
-    # 1. CIDR 聚合精简并一次性转换为字符串列表
+    # 3. CIDR 聚合精简并转换为字符串列表
     print("\n>>> 正在对 IPv4 进行 CIDR 聚合精简...")
     lines_v4 = [str(net) for net in ipaddress.collapse_addresses(ipv4_nets)]
     print(f"    IPv4 原始: {len(ipv4_nets)} 条 -> 聚合后: {len(lines_v4)} 条")
@@ -178,12 +179,18 @@ if __name__ == "__main__":
     lines_v6 = [str(net) for net in ipaddress.collapse_addresses(ipv6_nets)]
     print(f"    IPv6 原始: {len(ipv6_nets)} 条 -> 聚合后: {len(lines_v6)} 条")
 
-    # 2. 生成单协议产物
-    save_and_convert(lines_v4, OUTPUT_IPV4_TXT, OUTPUT_IPV4_MRS, mihomo_bin)
-    save_and_convert(lines_v6, OUTPUT_IPV6_TXT, OUTPUT_IPV6_MRS, mihomo_bin)
-
-    # 3. 零成本生成双栈产物（直接复用已生成的字符串列表，无需再次格式化）
+    # 复用已生成的字符串列表拼接，无额外序列化开销
     lines_all = lines_v4 + lines_v6
-    save_and_convert(lines_all, OUTPUT_ALL_TXT, OUTPUT_ALL_MRS, mihomo_bin)
+
+    # 4. 并行化写盘与 Mihomo 转码任务
+    print("\n>>> 并行生成 TXT 与二进制 MRS 产物...")
+    tasks = [
+        (lines_v4, OUTPUT_IPV4_TXT, OUTPUT_IPV4_MRS, mihomo_bin),
+        (lines_v6, OUTPUT_IPV6_TXT, OUTPUT_IPV6_MRS, mihomo_bin),
+        (lines_all, OUTPUT_ALL_TXT, OUTPUT_ALL_MRS, mihomo_bin),
+    ]
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        list(executor.map(save_and_convert_single_task, tasks))
 
     print("\n>>> 全部作业处理完成！")
