@@ -1756,3 +1756,12 @@
   "readme": "https://ipinfo.io/missingauth"
 }
 
+=== Run at 2026-09-17 23:32:58 UTC ===
+{
+  "status": 429,
+  "error": {
+    "title": "Rate limit hit",
+    "message": "Sign up at ipinfo.io"
+  }
+}
+
