@@ -2640,3 +2640,16 @@
   "readme": "https://ipinfo.io/missingauth"
 }
 
+=== Run at 2026-11-24 05:18:47 UTC ===
+{
+  "ip": "20.106.23.88",
+  "city": "Des Moines",
+  "region": "Iowa",
+  "country": "US",
+  "loc": "41.6005,-93.6091",
+  "org": "AS8075 Microsoft Corporation",
+  "postal": "50309",
+  "timezone": "America/Chicago",
+  "readme": "https://ipinfo.io/missingauth"
+}
+
